@@ -1,0 +1,12 @@
+version: '3'
+services:
+  golang:
+    build: ./
+    container_name: demo-golang
+    volumes:
+      - ./:/go/src/demo:rw
+    ports:
+      - 8088:8088
+    tty: true
+
+# golang 容器下 tty: true 必须，否则在执行 docker-compose up -d 时 golang 容器将退出

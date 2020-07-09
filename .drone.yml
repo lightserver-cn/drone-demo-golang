@@ -1,0 +1,63 @@
+kind: pipeline
+name: demo
+
+# 工作目录 [module 模式下 path 不能在 go 下]
+workspace:
+  base: /go
+  path: /usr/local/
+
+steps:
+  - name: test
+    image: golang:latest
+    commands:
+      - go test
+
+  - name: build
+    image: golang:latest
+    commands:
+      - go build .
+
+# from_secret 表示使用 drone 管理界面中，对应界面设置的 Secrets 参数，可以用于保护敏感信息泄露
+  - name: scp
+    image: appleboy/drone-scp
+    settings:
+      host:
+        from_secret: scp_host
+      username:
+        from_secret: scp_username
+      password:
+        from_secret: scp_password
+      port: 22
+      target: /var/www/deploy/${DRONE_REPO_OWNER}/${DRONE_REPO_NAME}
+      source:
+        - ./*
+
+# from_secret 表示使用 drone 管理界面中，对应界面设置的 Secrets 参数，可以用于保护敏感信息泄露
+  - name: ssh
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: ssh_host
+      username:
+        from_secret: ssh_username
+      password:
+        from_secret: ssh_password
+      port: 22
+      command_timeout: 2m
+      script:
+        - echo "------------------< 进入项目目录 >------------------"
+        - cd /var/www/deploy/${DRONE_REPO_OWNER}/${DRONE_REPO_NAME}
+        - echo "------------------< 停止容器 >------------------"
+        - docker stop demo-golang
+        - echo "------------------< 删除容器 >------------------"
+        - docker rm -v demo-golang
+        - echo "------------------< 删除旧镜像 >------------------"
+        - docker rmi golang
+        - echo "------------------< 拉取新镜像 >------------------"
+        - docker pull golang
+        - echo "------------------< 运行新镜像 >------------------"
+        - docker-compose up -d
+        - echo "------------------< 开放端口 >------------------"
+        - firewall-cmd --zone=public --remove-port=8088/tcp --permanent
+        - exit
+
